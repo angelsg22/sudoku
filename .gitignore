@@ -1,0 +1,15 @@
+# Entorno virtual de Python
+venv/
+
+# Caché de Python (archivos compilados que se generan automáticamente)
+__pycache__/
+*.pyc
+*.pyo
+
+# Variables de entorno (contraseñas, claves secretas, etc.)
+.env
+.env.*
+
+# Archivos de sistema operativo
+.DS_Store       # Mac
+Thumbs.db       # Windows
