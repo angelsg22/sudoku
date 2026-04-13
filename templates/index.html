@@ -1,0 +1,1699 @@
+<!DOCTYPE html>
+<!--
+  index.html — Página principal del juego de Sudoku
+  =====================================================
+
+  Este archivo tiene TRES partes:
+    1. HTML  → la estructura (los elementos de la página)
+    2. CSS   → el estilo (colores, tamaños, disposición)
+    3. JS    → la lógica del navegador (eventos, llamadas al servidor)
+
+  El navegador carga este archivo cuando entras a http://localhost:5000.
+  Flask lo sirve desde la carpeta "templates/".
+-->
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <!-- Esto hace que la página se vea bien en móviles -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sudoku</title>
+
+  <!-- Favicon SVG: el icono que aparece en la pestaña del navegador -->
+  <!-- Flask sirve archivos de la carpeta "static/" en la ruta /static/ -->
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+
+  <!-- ===================================================================
+       CSS — ESTILOS
+       ===================================================================
+       Todo el diseño visual está aquí dentro de la etiqueta <style>.
+  -->
+  <style>
+    /* ================================================================== */
+    /* SISTEMA DE PALETAS + TEMAS                                         */
+    /* ================================================================== */
+    /*
+      Cómo funciona el sistema de dos capas:
+        1. Las variables --p-* definen la PALETA (familia de colores del acento).
+           Cambiar la paleta solo sobreescribe estas variables.
+        2. Las variables de TEMA (--bg-*, --color-*, etc.) consumen las --p-*
+           via var(). El tema claro/oscuro cambia los fondos y superficies,
+           pero siempre usando el color de acento de la paleta activa.
+
+      Resultado: cualquier combinación paleta × tema funciona automáticamente.
+    */
+
+    /* ------------------------------------------------------------------ */
+    /* PALETA POR DEFECTO: AZUL                                            */
+    /* ------------------------------------------------------------------ */
+    :root {
+      /* Variables de paleta: de más oscuro (900) a más claro (50) */
+      --p-900: #1e3a8a;
+      --p-700: #1e40af;
+      --p-600: #2563eb;
+      --p-500: #3b82f6;
+      --p-200: #bfdbfe;
+      --p-100: #dbeafe;
+      --p-50:  #eff6ff;
+      --sombra-btn: rgba(37, 99, 235, 0.35);
+
+      /* Variables de tema — MODO CLARO */
+      --bg-page:          linear-gradient(135deg, var(--p-100) 0%, var(--p-50) 40%, #f0f4f8 100%);
+      --color-texto:      #1e293b;
+      --color-titulo:     var(--p-700);
+
+      --bg-tarjeta:       #ffffff;
+      --borde-tarjeta:    #e5e7eb;
+      --color-label:      #6b7280;
+      --bg-input:         #f9fafb;
+
+      --bg-celda:         #ffffff;
+      --bg-celda-fija:    var(--p-100);
+      --color-celda-fija: var(--p-700);
+      --bg-celda-sel:     var(--p-200);
+      --borde-tablero:    var(--p-700);
+
+      --grad-btn:         linear-gradient(135deg, var(--p-700), var(--p-600));
+      --grad-btn-hover:   linear-gradient(135deg, var(--p-900), var(--p-700));
+
+      --bg-btn-sec:       #f3f4f6;
+      --color-btn-sec:    #374151;
+      --borde-btn-sec:    #e5e7eb;
+
+      --bg-pistas:        #fffbeb;
+      --borde-pistas:     #fde68a;
+      --color-pistas:     #92400e;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* MODO OSCURO                                                          */
+    /* Sobreescribe solo las variables de tema, no las de paleta.          */
+    /* Así el modo oscuro respeta la paleta que el usuario haya elegido.   */
+    /* ------------------------------------------------------------------ */
+    html.dark {
+      --bg-page:          linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+      --color-texto:      #e2e8f0;
+      --color-titulo:     var(--p-200);
+
+      --bg-tarjeta:       #1e293b;
+      --borde-tarjeta:    #334155;
+      --color-label:      #94a3b8;
+      --bg-input:         #0f172a;
+
+      --bg-celda:         #1e293b;
+      --bg-celda-fija:    var(--p-900);
+      --color-celda-fija: var(--p-200);
+      --bg-celda-sel:     var(--p-700);
+      --borde-tablero:    var(--p-500);
+
+      --grad-btn:         linear-gradient(135deg, var(--p-700), var(--p-500));
+      --grad-btn-hover:   linear-gradient(135deg, var(--p-900), var(--p-600));
+
+      --bg-btn-sec:       #334155;
+      --color-btn-sec:    #e2e8f0;
+      --borde-btn-sec:    #475569;
+
+      --bg-pistas:        #1e293b;
+      --borde-pistas:     #854d0e;
+      --color-pistas:     #fbbf24;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* PALETAS ADICIONALES                                                  */
+    /* Solo sobreescriben las --p-*. El resto se calcula automáticamente.  */
+    /* ------------------------------------------------------------------ */
+    html[data-palette="verde"] {
+      --p-900: #14532d;
+      --p-700: #166534;
+      --p-600: #16a34a;
+      --p-500: #22c55e;
+      --p-200: #bbf7d0;
+      --p-100: #dcfce7;
+      --p-50:  #f0fdf4;
+      --sombra-btn: rgba(22, 163, 74, 0.35);
+    }
+
+    html[data-palette="purpura"] {
+      --p-900: #4c1d95;
+      --p-700: #6d28d9;
+      --p-600: #7c3aed;
+      --p-500: #8b5cf6;
+      --p-200: #ddd6fe;
+      --p-100: #ede9fe;
+      --p-50:  #f5f3ff;
+      --sombra-btn: rgba(124, 58, 237, 0.35);
+    }
+
+    html[data-palette="rosa"] {
+      --p-900: #881337;
+      --p-700: #be123c;
+      --p-600: #e11d48;
+      --p-500: #f43f5e;
+      --p-200: #fecdd3;
+      --p-100: #ffe4e6;
+      --p-50:  #fff1f2;
+      --sombra-btn: rgba(225, 29, 72, 0.35);
+    }
+
+    html[data-palette="naranja"] {
+      --p-900: #78350f;
+      --p-700: #b45309;
+      --p-600: #d97706;
+      --p-500: #f59e0b;
+      --p-200: #fde68a;
+      --p-100: #fef3c7;
+      --p-50:  #fffbeb;
+      --sombra-btn: rgba(217, 119, 6, 0.35);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* RESET Y BASE                                                         */
+    /* ------------------------------------------------------------------ */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    /* Fondo con gradiente diagonal suave para que la página no quede plana */
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: var(--bg-page);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 28px 16px 40px;
+      color: var(--color-texto);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* CABECERA                                                             */
+    /* ------------------------------------------------------------------ */
+    header {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+
+    /* Fila superior del header: título + botón modo oscuro */
+    .header-top {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    /* Título grande con sombra de texto para más presencia */
+    header h1 {
+      font-size: 3rem;
+      font-weight: 800;
+      color: var(--color-titulo);
+      letter-spacing: 4px;
+      text-shadow: 0 2px 8px rgba(30, 64, 175, 0.15);
+    }
+
+    /* Franja de estadísticas: temporizador + mejor tiempo en fila */
+    .stats-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      margin-top: 14px;
+      flex-wrap: wrap;
+    }
+
+    /* Tarjeta individual de stat (temporizador, mejor tiempo) */
+    .stat-card {
+      background: var(--bg-tarjeta);
+      border-radius: 12px;
+      padding: 10px 22px;
+      box-shadow: 0 2px 10px rgba(30, 64, 175, 0.1);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 110px;
+    }
+
+    .stat-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--color-label);
+      margin-bottom: 2px;
+    }
+
+    /* El temporizador ocupa más espacio visual */
+    #temporizador {
+      font-size: 2rem;
+      font-weight: 800;
+      color: #1e3a5f;
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+    }
+
+    #mejor-tiempo {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #d97706;
+      line-height: 1;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* LAYOUT PRINCIPAL: tablero + panel                                   */
+    /* ------------------------------------------------------------------ */
+    .contenedor-juego {
+      display: flex;
+      gap: 28px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      justify-content: center;
+      width: 100%;
+      max-width: 1000px;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* TABLERO DE SUDOKU                                                    */
+    /* Cuadrícula 9×9 con los cuadrados 3×3 separados visualmente          */
+    /* ------------------------------------------------------------------ */
+    .contenedor-tablero {
+      position: relative;
+      /* box-shadow es mucho más eficiente que filter:drop-shadow.
+         drop-shadow re-renderiza todos los hijos (81 celdas) como una capa;
+         box-shadow solo afecta al elemento contenedor. */
+      box-shadow: 0 12px 32px rgba(30, 64, 175, 0.18);
+    }
+
+    #tablero {
+      display: grid;
+      grid-template-columns: repeat(9, 1fr);
+      grid-template-rows: repeat(9, 1fr);
+      width: min(540px, 95vw);
+      height: min(540px, 95vw);
+      border: 3px solid var(--borde-tablero);
+      background: var(--borde-tablero);
+      gap: 1px;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    /* Cada celda */
+    .celda {
+      background: var(--bg-celda);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: clamp(15px, 3.2vw, 24px);
+      cursor: pointer;
+      transition: background 0.12s;
+      user-select: none;
+      font-weight: 500;
+    }
+
+    /* Bordes gruesos para delimitar los cuadrados 3×3 */
+    .celda:nth-child(3n) {
+      border-right: 2px solid var(--borde-tablero);
+    }
+    .celda:nth-child(n+19):nth-child(-n+27),
+    .celda:nth-child(n+46):nth-child(-n+54) {
+      border-bottom: 2px solid var(--borde-tablero);
+    }
+
+    /* Celda fija: número del puzzle original */
+    .celda-fija {
+      background: var(--bg-celda-fija);
+      font-weight: 800;
+      color: var(--color-celda-fija);
+      cursor: default;
+    }
+
+    /* Celda seleccionada por el usuario */
+    .celda-seleccionada {
+      background: var(--bg-celda-sel) !important;
+      outline: 2px solid var(--borde-tablero);
+      outline-offset: -2px;
+    }
+
+    /* Celda con número incorrecto */
+    .celda-error {
+      background: #fee2e2 !important;
+      color: #dc2626 !important;
+    }
+
+    /* Celda con pista revelada */
+    .celda-pista {
+      background: #dcfce7 !important;
+      color: #15803d !important;
+      font-weight: 700;
+    }
+
+    /* Número introducido por el usuario */
+    .celda-usuario {
+      color: #374151;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* PANTALLA DE INICIO (cubre el tablero antes de empezar)              */
+    /* ------------------------------------------------------------------ */
+    #pantalla-inicio {
+      position: absolute;
+      inset: 0;
+      background: color-mix(in srgb, var(--borde-tablero) 90%, transparent);
+      backdrop-filter: blur(2px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border-radius: 10px;
+      color: white;
+      text-align: center;
+      gap: 10px;
+    }
+
+    #pantalla-inicio h2 {
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: 2px;
+    }
+
+    #pantalla-inicio p {
+      font-size: 1.05rem;
+      opacity: 0.88;
+      line-height: 1.6;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* PANEL DE CONTROLES                                                   */
+    /* ------------------------------------------------------------------ */
+    .panel-controles {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: 260px;
+    }
+
+    /* Tarjeta genérica dentro del panel */
+    .tarjeta {
+      background: var(--bg-tarjeta);
+      border-radius: 14px;
+      padding: 18px;
+      box-shadow: 0 4px 16px rgba(30, 64, 175, 0.08);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    /* Título de sección dentro de una tarjeta */
+    .seccion-titulo {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--color-label);
+      margin-bottom: 2px;
+    }
+
+    /* Selector de dificultad */
+    select {
+      padding: 11px 14px;
+      border: 2px solid var(--borde-tarjeta);
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      background: var(--bg-input);
+      cursor: pointer;
+      color: var(--color-texto);
+      width: 100%;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%231e40af' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      padding-right: 36px;
+    }
+
+    select:focus {
+      outline: none;
+      border-color: var(--borde-tablero);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* BOTONES                                                              */
+    /* ------------------------------------------------------------------ */
+    button {
+      padding: 13px 16px;
+      border: none;
+      border-radius: 10px;
+      font-size: 0.97rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: box-shadow 0.1s, background 0.15s;
+      width: 100%;
+      letter-spacing: 0.3px;
+    }
+
+    .btn-primario {
+      background: var(--grad-btn);
+      color: white;
+      box-shadow: 0 4px 14px var(--sombra-btn);
+    }
+
+    .btn-primario:hover {
+      background: var(--grad-btn-hover);
+      box-shadow: 0 6px 18px var(--sombra-btn);
+    }
+
+    .btn-secundario {
+      background: var(--bg-btn-sec);
+      color: var(--color-btn-sec);
+      border: 1.5px solid var(--borde-btn-sec);
+    }
+
+    .btn-secundario:hover {
+      filter: brightness(0.95);
+    }
+
+    .btn-peligro {
+      background: #fff1f2;
+      color: #dc2626;
+      border: 1.5px solid #fecaca;
+    }
+
+    .btn-peligro:hover {
+      background: #fee2e2;
+    }
+
+    /* Contador de pistas: tarjeta pequeña con puntos visuales */
+    .pistas-display {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      background: var(--bg-pistas);
+      border: 1.5px solid var(--borde-pistas);
+      border-radius: 10px;
+    }
+
+    .pistas-texto {
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--color-pistas);
+    }
+
+    /* Puntos que representan las pistas (se apagan al usarlas) */
+    .pistas-puntos {
+      display: flex;
+      gap: 6px;
+    }
+
+    .punto-pista {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #f59e0b;
+    }
+
+    .punto-pista.usado {
+      background: #d1d5db;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* TECLADO NUMÉRICO REDISEÑADO                                          */
+    /* Diseño: rejilla 3×3 + botón borrar en fila aparte                   */
+    /* ------------------------------------------------------------------ */
+    .teclado-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    /* Los 9 números en rejilla 3×3 */
+    .teclado-numeros {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .tecla {
+      aspect-ratio: 1;
+      background: var(--bg-tarjeta);
+      border: 2px solid var(--borde-tarjeta);
+      border-radius: 12px;
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--color-texto);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.12s, border-color 0.12s;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+      user-select: none;
+    }
+
+    .tecla:hover {
+      background: var(--bg-celda-fija);
+      border-color: var(--borde-tablero);
+    }
+
+    .tecla:active {
+      background: var(--bg-celda-sel);
+    }
+
+    /* Botón borrar: ancho completo, diferente color */
+    .tecla-borrar {
+      width: 100%;
+      aspect-ratio: auto;        /* no cuadrado: más bajo */
+      padding: 13px;
+      background: #fff1f2;
+      border: 2px solid #fecaca;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-weight: 700;
+      color: #dc2626;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background 0.12s;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+      user-select: none;
+    }
+
+    .tecla-borrar:hover {
+      background: #fee2e2;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* MENSAJE DE RESULTADO                                                 */
+    /* ------------------------------------------------------------------ */
+    #mensaje {
+      text-align: center;
+      padding: 16px 24px;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-weight: 700;
+      display: none;
+      margin-top: 20px;
+      max-width: 600px;
+      width: 100%;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+    }
+
+    .mensaje-correcto {
+      background: #f0fdf4;
+      color: #15803d;
+      border: 2px solid #86efac;
+    }
+
+    .mensaje-error {
+      background: #fff1f2;
+      color: #dc2626;
+      border: 2px solid #fca5a5;
+    }
+
+    .mensaje-info {
+      background: var(--p-50);
+      color: var(--p-700);
+      border: 2px solid var(--p-200);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* BOTÓN DE OPCIONES (⚙️ en el header)                                 */
+    /* ------------------------------------------------------------------ */
+    #btn-opciones {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      border: 2px solid var(--borde-tarjeta);
+      background: var(--bg-tarjeta);
+      color: var(--color-texto);
+      font-size: 1.15rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.3s;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      flex-shrink: 0;
+      /* Sobrescribimos el width:100% del selector global "button" */
+      width: 42px;
+    }
+
+    #btn-opciones:hover {
+      transform: rotate(60deg);
+      border-color: var(--borde-tablero);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* MODAL DE OPCIONES                                                    */
+    /* ------------------------------------------------------------------ */
+    /* Overlay: fondo oscuro semitransparente que cubre toda la pantalla */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      /* Empieza invisible y sin capturar clics */
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s;
+    }
+
+    /* La clase "visible" lo activa (JS la añade/quita) */
+    .modal-overlay.visible {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    /* Caja del modal */
+    .modal {
+      background: var(--bg-tarjeta);
+      border-radius: 20px;
+      padding: 28px;
+      width: min(400px, 92vw);
+      box-shadow: 0 24px 64px rgba(0,0,0,0.2);
+      /* Pequeña animación de entrada: sube y escala */
+      transform: translateY(20px) scale(0.96);
+      transition: transform 0.25s;
+    }
+
+    .modal-overlay.visible .modal {
+      transform: translateY(0) scale(1);
+    }
+
+    /* Cabecera del modal: título + botón cerrar */
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+
+    .modal-titulo {
+      font-size: 1.2rem;
+      font-weight: 800;
+      color: var(--color-titulo);
+      letter-spacing: 0.5px;
+    }
+
+    /* Botón X para cerrar el modal */
+    .modal-cerrar {
+      width: 34px !important;   /* !important para ganar al selector global button */
+      height: 34px;
+      border-radius: 50%;
+      border: 2px solid var(--borde-tarjeta) !important;
+      background: var(--bg-btn-sec);
+      color: var(--color-texto);
+      font-size: 0.9rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      flex-shrink: 0;
+    }
+
+    .modal-cerrar:hover {
+      background: var(--borde-tarjeta);
+    }
+
+    /* Sección dentro del modal */
+    .modal-seccion {
+      margin-bottom: 24px;
+    }
+
+    .modal-seccion:last-child {
+      margin-bottom: 0;
+    }
+
+    .modal-seccion-titulo {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--color-label);
+      margin-bottom: 14px;
+    }
+
+    /* Separador entre secciones */
+    .modal-separador {
+      border: none;
+      border-top: 1px solid var(--borde-tarjeta);
+      margin-bottom: 22px;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* TOGGLE SWITCH (interruptor on/off para modo oscuro)                 */
+    /* ------------------------------------------------------------------ */
+    .toggle-fila {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .toggle-label {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--color-texto);
+    }
+
+    /* Contenedor del toggle */
+    .toggle {
+      position: relative;
+      width: 52px;
+      height: 28px;
+      flex-shrink: 0;
+    }
+
+    /* El input real queda invisible (lo reemplaza el track visual) */
+    .toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+      position: absolute;
+    }
+
+    /* La "pista" del toggle: el fondo que cambia de gris a color */
+    .toggle-track {
+      position: absolute;
+      inset: 0;
+      background: #cbd5e0;
+      border-radius: 99px;
+      cursor: pointer;
+      transition: background 0.25s;
+    }
+
+    .toggle input:checked + .toggle-track {
+      background: var(--borde-tablero);
+    }
+
+    /* El círculo blanco que se desliza */
+    .toggle-track::after {
+      content: '';
+      position: absolute;
+      left: 3px;
+      top: 3px;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: white;
+      transition: transform 0.25s;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+    }
+
+    /* Cuando está activo, el círculo se mueve a la derecha */
+    .toggle input:checked + .toggle-track::after {
+      transform: translateX(24px);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* PALETAS DE COLOR                                                     */
+    /* ------------------------------------------------------------------ */
+    /* Rejilla de 5 círculos de color */
+    .paletas-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 10px;
+    }
+
+    .paleta-opcion {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+
+    /* Cada círculo de color */
+    .paleta-circulo {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 3px solid transparent;
+      outline: 2px solid transparent;
+      outline-offset: 2px;
+      transition: transform 0.15s, outline-color 0.15s;
+    }
+
+    .paleta-opcion:hover .paleta-circulo {
+      transform: scale(1.12);
+    }
+
+    /* Paleta activa: resaltada con outline del color de texto */
+    .paleta-opcion.activa .paleta-circulo {
+      outline-color: var(--color-texto);
+    }
+
+    /* Nombre de la paleta */
+    .paleta-nombre {
+      font-size: 0.68rem;
+      font-weight: 600;
+      color: var(--color-label);
+      text-align: center;
+    }
+
+    .paleta-opcion.activa .paleta-nombre {
+      color: var(--color-titulo);
+      font-weight: 700;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* BLOQUEO DE TRANSICIONES DURANTE CAMBIO DE TEMA                      */
+    /* ------------------------------------------------------------------ */
+    /* Cuando JS añade esta clase a <html>, todas las transiciones se
+       desactivan instantáneamente. Se quita en el siguiente frame.
+       Así el cambio de paleta/tema es inmediato sin animaciones. */
+    .sin-transicion *,
+    .sin-transicion *::before,
+    .sin-transicion *::after {
+      transition: none !important;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* ANIMACIONES                                                          */
+    /* ------------------------------------------------------------------ */
+    @keyframes pulsar {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.55; }
+    }
+
+    .cargando {
+      animation: pulsar 0.8s infinite;
+      pointer-events: none;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* RESPONSIVE — MÓVIL                                                   */
+    /* ------------------------------------------------------------------ */
+    @media (max-width: 640px) {
+      header h1 {
+        font-size: 2.2rem;
+      }
+
+      .contenedor-juego {
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .panel-controles {
+        width: min(540px, 95vw);
+      }
+
+      /* En móvil el teclado puede tener teclas un poco más pequeñas */
+      .tecla {
+        font-size: 1.3rem;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ==================================================================
+       CABECERA
+  =================================================================== -->
+  <header>
+    <div class="header-top">
+      <h1>SUDOKU</h1>
+      <!-- Botón que abre el modal de opciones (modo oscuro, paleta...) -->
+      <button id="btn-opciones" onclick="abrirOpciones()" title="Opciones">⚙️</button>
+    </div>
+
+    <!-- Barra de estadísticas: temporizador y mejor tiempo -->
+    <div class="stats-bar">
+      <div class="stat-card">
+        <span class="stat-label">Tiempo</span>
+        <span id="temporizador">00:00</span>
+      </div>
+      <div class="stat-card" id="card-mejor-tiempo" style="display:none;">
+        <span class="stat-label">🏆 Récord</span>
+        <span id="mejor-tiempo">--:--</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ==================================================================
+       LAYOUT PRINCIPAL
+  =================================================================== -->
+  <div class="contenedor-juego">
+
+    <!-- TABLERO -->
+    <div class="contenedor-tablero">
+      <div id="tablero">
+        <!-- Las 81 celdas se generan con JavaScript -->
+      </div>
+
+      <!-- Pantalla de inicio: se oculta al pulsar "Nuevo juego" -->
+      <div id="pantalla-inicio">
+        <h2>SUDOKU</h2>
+        <p>Elige la dificultad y pulsa<br><strong>Nuevo juego</strong> para empezar</p>
+      </div>
+    </div>
+
+    <!-- PANEL DE CONTROLES -->
+    <div class="panel-controles">
+
+      <!-- Tarjeta 1: Partida -->
+      <div class="tarjeta">
+        <span class="seccion-titulo">Nueva partida</span>
+
+        <select id="dificultad">
+          <option value="facil">Fácil</option>
+          <option value="medio" selected>Medio</option>
+          <option value="dificil">Difícil</option>
+        </select>
+
+        <button class="btn-primario" onclick="nuevoJuego()">Nuevo juego</button>
+        <button class="btn-primario" onclick="comprobar()">Comprobar</button>
+      </div>
+
+      <!-- Tarjeta 2: Ayuda -->
+      <div class="tarjeta">
+        <span class="seccion-titulo">Ayuda</span>
+
+        <!-- Puntos visuales que representan las pistas disponibles -->
+        <div class="pistas-display">
+          <span class="pistas-texto">Pistas disponibles</span>
+          <div class="pistas-puntos" id="pistas-puntos">
+            <div class="punto-pista" id="punto-0"></div>
+            <div class="punto-pista" id="punto-1"></div>
+            <div class="punto-pista" id="punto-2"></div>
+          </div>
+        </div>
+
+        <button class="btn-secundario" onclick="pedirPista()">💡 Pedir pista</button>
+        <button class="btn-peligro"    onclick="revelarSolucion()">👁 Revelar solución</button>
+      </div>
+
+      <!-- Tarjeta 3: Teclado numérico -->
+      <div class="tarjeta">
+        <span class="seccion-titulo">Teclado</span>
+
+        <div class="teclado-wrapper">
+          <!-- Rejilla 3×3 con los números 1-9 -->
+          <div class="teclado-numeros">
+            <div class="tecla" onclick="teclaNumero(1)">1</div>
+            <div class="tecla" onclick="teclaNumero(2)">2</div>
+            <div class="tecla" onclick="teclaNumero(3)">3</div>
+            <div class="tecla" onclick="teclaNumero(4)">4</div>
+            <div class="tecla" onclick="teclaNumero(5)">5</div>
+            <div class="tecla" onclick="teclaNumero(6)">6</div>
+            <div class="tecla" onclick="teclaNumero(7)">7</div>
+            <div class="tecla" onclick="teclaNumero(8)">8</div>
+            <div class="tecla" onclick="teclaNumero(9)">9</div>
+          </div>
+
+          <!-- Botón borrar: ocupa todo el ancho -->
+          <div class="tecla-borrar" onclick="teclaNumero(0)">
+            ✕ Borrar
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Mensaje de resultado (correcto / errores) -->
+  <div id="mensaje"></div>
+
+  <!-- ==================================================================
+       MODAL DE OPCIONES
+       ==================================================================
+       Se muestra encima de todo cuando el usuario pulsa ⚙️.
+       Contiene: toggle de modo oscuro + selector de paleta de colores.
+       La clase "visible" la añade/quita JavaScript.
+  -->
+  <div class="modal-overlay" id="modal-overlay" onclick="cerrarAlClickarFuera(event)">
+    <div class="modal">
+
+      <!-- Cabecera del modal -->
+      <div class="modal-header">
+        <span class="modal-titulo">Opciones</span>
+        <button class="modal-cerrar" onclick="cerrarOpciones()">✕</button>
+      </div>
+
+      <!-- SECCIÓN 1: Apariencia (modo oscuro) -->
+      <div class="modal-seccion">
+        <div class="modal-seccion-titulo">Apariencia</div>
+
+        <!-- Toggle switch para modo oscuro -->
+        <!-- Un <label> envuelve el input para que al pulsar el track se active -->
+        <div class="toggle-fila">
+          <span class="toggle-label">Modo oscuro</span>
+          <label class="toggle">
+            <input type="checkbox" id="toggle-oscuro" onchange="alternarTema()">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+      </div>
+
+      <hr class="modal-separador">
+
+      <!-- SECCIÓN 2: Paletas de color -->
+      <div class="modal-seccion">
+        <div class="modal-seccion-titulo">Paleta de colores</div>
+
+        <!-- 5 círculos de color clicables -->
+        <!-- data-paleta="" es la paleta por defecto (azul, sin atributo en <html>) -->
+        <div class="paletas-grid">
+
+          <div class="paleta-opcion" data-paleta="" onclick="seleccionarPaleta('')">
+            <div class="paleta-circulo"
+                 style="background: #2563eb;">
+            </div>
+            <span class="paleta-nombre">Azul</span>
+          </div>
+
+          <div class="paleta-opcion" data-paleta="verde" onclick="seleccionarPaleta('verde')">
+            <div class="paleta-circulo"
+                 style="background: #16a34a;">
+            </div>
+            <span class="paleta-nombre">Verde</span>
+          </div>
+
+          <div class="paleta-opcion" data-paleta="purpura" onclick="seleccionarPaleta('purpura')">
+            <div class="paleta-circulo"
+                 style="background: #7c3aed;">
+            </div>
+            <span class="paleta-nombre">Púrpura</span>
+          </div>
+
+          <div class="paleta-opcion" data-paleta="rosa" onclick="seleccionarPaleta('rosa')">
+            <div class="paleta-circulo"
+                 style="background: #e11d48;">
+            </div>
+            <span class="paleta-nombre">Rosa</span>
+          </div>
+
+          <div class="paleta-opcion" data-paleta="naranja" onclick="seleccionarPaleta('naranja')">
+            <div class="paleta-circulo"
+                 style="background: #d97706;">
+            </div>
+            <span class="paleta-nombre">Naranja</span>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+
+  <!-- ==================================================================
+       JAVASCRIPT — Lógica del navegador
+       ==================================================================
+
+       Este código se ejecuta en el NAVEGADOR (no en el servidor).
+       Su trabajo es:
+         1. Pintar el tablero en pantalla
+         2. Detectar qué celdas toca el usuario
+         3. Comunicarse con Flask (fetch API)
+         4. Actualizar el temporizador
+
+       IMPORTANTE: el navegador NO conoce la solución.
+       Toda la validación ocurre en Python (servidor).
+  -->
+  <script>
+
+    // =========================================================================
+    // VARIABLES GLOBALES
+    // Las variables declaradas aquí son accesibles desde todas las funciones
+    // =========================================================================
+
+    let tableroActual    = [];    // Matriz 9x9 del puzzle (0 = vacío)
+    let respuestaUsuario = [];   // Matriz 9x9 con los números que ha puesto el usuario
+    let celdaSeleccionada = null; // La celda del DOM que el usuario tiene seleccionada
+    let filaSeleccionada  = -1;  // Fila de la celda seleccionada
+    let colSeleccionada   = -1;  // Columna de la celda seleccionada
+    let pistasDisponibles = 3;   // El usuario tiene 3 pistas por partida
+    let juegoActivo       = false; // ¿Hay una partida en curso?
+
+    // Variables del temporizador
+    let segundosTranscurridos = 0;
+    let intervaloTemporizador = null; // Referencia al intervalo para poder detenerlo
+
+
+    // =========================================================================
+    // FUNCIÓN: inicializarTablero
+    // =========================================================================
+    // Crea las 81 celdas del tablero (9x9) en el HTML.
+    // Se llama UNA SOLA VEZ al cargar la página.
+    // =========================================================================
+    function inicializarTablero() {
+      const contenedorTablero = document.getElementById("tablero");
+      contenedorTablero.innerHTML = "";
+
+      for (let fila = 0; fila < 9; fila++) {
+        for (let col = 0; col < 9; col++) {
+          const celda = document.createElement("div");
+          celda.classList.add("celda");
+
+          // Guardamos la posición como atributos del elemento HTML
+          // Así podemos recuperarlos cuando el usuario haga clic
+          celda.dataset.fila = fila;
+          celda.dataset.col  = col;
+
+          // Cuando el usuario hace clic en una celda → seleccionarla
+          celda.addEventListener("click", () => seleccionarCelda(fila, col, celda));
+
+          contenedorTablero.appendChild(celda);
+        }
+      }
+    }
+
+
+    // =========================================================================
+    // FUNCIÓN: pintarTablero
+    // =========================================================================
+    // Actualiza el HTML con los valores del tablero actual.
+    // Se llama después de recibir un nuevo puzzle del servidor.
+    //
+    // Parámetros:
+    //   puzzle → matriz 9x9 (0 = vacío, número = celda fija)
+    // =========================================================================
+    function pintarTablero(puzzle) {
+      tableroActual = puzzle;
+
+      // Copiamos el puzzle como respuesta inicial del usuario
+      // (las celdas fijas ya tienen su valor; las vacías = 0)
+      respuestaUsuario = puzzle.map(fila => [...fila]); // copia profunda con spread
+
+      const celdas = document.querySelectorAll(".celda");
+
+      for (let fila = 0; fila < 9; fila++) {
+        for (let col = 0; col < 9; col++) {
+          const indice = fila * 9 + col;
+          const celda  = celdas[indice];
+          const valor  = puzzle[fila][col];
+
+          celda.className   = "celda";
+          celda.textContent = "";
+
+          if (valor !== 0) {
+            // Celda fija: tiene número del puzzle, no es editable
+            celda.textContent = valor;
+            celda.classList.add("celda-fija");
+          }
+        }
+      }
+
+      // Deseleccionamos cualquier celda anterior
+      celdaSeleccionada = null;
+      filaSeleccionada  = -1;
+      colSeleccionada   = -1;
+    }
+
+
+    // =========================================================================
+    // FUNCIÓN: seleccionarCelda
+    // =========================================================================
+    // Marca una celda como seleccionada (la que el usuario va a editar).
+    // Solo funciona con celdas vacías (las fijas no son editables).
+    // =========================================================================
+    function seleccionarCelda(fila, col, elemento) {
+      if (!juegoActivo) return;
+      if (elemento.classList.contains("celda-fija")) return;
+
+      if (celdaSeleccionada) {
+        celdaSeleccionada.classList.remove("celda-seleccionada");
+      }
+
+      elemento.classList.add("celda-seleccionada");
+      celdaSeleccionada = elemento;
+      filaSeleccionada  = fila;
+      colSeleccionada   = col;
+    }
+
+
+    // =========================================================================
+    // FUNCIÓN: teclaNumero
+    // =========================================================================
+    // Pone un número en la celda seleccionada.
+    // Se llama desde el teclado en pantalla O desde el teclado físico.
+    //
+    // Parámetros:
+    //   num → número a introducir (0 = borrar)
+    // =========================================================================
+    function teclaNumero(num) {
+      if (!juegoActivo) return;
+      if (!celdaSeleccionada) return;
+
+      respuestaUsuario[filaSeleccionada][colSeleccionada] = num;
+      celdaSeleccionada.textContent = num === 0 ? "" : num;
+
+      celdaSeleccionada.classList.remove("celda-error", "celda-pista");
+      celdaSeleccionada.classList.add("celda-usuario");
+
+      if (num === 0) {
+        celdaSeleccionada.classList.remove("celda-usuario");
+      }
+    }
+
+
+    // =========================================================================
+    // FUNCIÓN: actualizarPuntosPistas
+    // =========================================================================
+    // Apaga los puntos visuales que representan las pistas restantes.
+    // =========================================================================
+    function actualizarPuntosPistas() {
+      for (let i = 0; i < 3; i++) {
+        const punto = document.getElementById(`punto-${i}`);
+        if (i < pistasDisponibles) {
+          punto.classList.remove("usado");
+        } else {
+          punto.classList.add("usado");
+        }
+      }
+    }
+
+
+    // =========================================================================
+    // FUNCIÓN: nuevoJuego
+    // =========================================================================
+    // Llama a la API de Flask para obtener un nuevo puzzle.
+    // Usa "fetch" que es la forma moderna de hacer peticiones HTTP desde JS.
+    // =========================================================================
+    async function nuevoJuego() {
+      const dificultad = document.getElementById("dificultad").value;
+
+      mostrarMensaje("Generando tablero...", "info");
+
+      try {
+        // fetch() envía una petición HTTP al servidor
+        // "await" espera la respuesta sin bloquear el navegador
+        const respuesta = await fetch("/api/nuevo-juego", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dificultad: dificultad })
+        });
+
+        const datos = await respuesta.json();
+
+        pintarTablero(datos.puzzle);
+
+        // Reiniciamos el estado del juego
+        pistasDisponibles = 3;
+        actualizarPuntosPistas();
+        juegoActivo = true;
+
+        // Ocultamos la pantalla de inicio
+        document.getElementById("pantalla-inicio").style.display = "none";
+
+        reiniciarTemporizador();
+        mostrarMejorTiempo(); // actualizamos el récord para esta dificultad
+        ocultarMensaje();
+
+      } catch (error) {
+        mostrarMensaje("Error al conectar con el servidor. ¿Está Flask en ejecución?", "error");
+        console.error("Error en nuevoJuego:", error);
+      }
+    }
+
+
+    // =========================================================================
+    // FUNCIÓN: comprobar
+    // =========================================================================
+    // Envía la respuesta del usuario al servidor para validarla.
+    // =========================================================================
+    async function comprobar() {
+      if (!juegoActivo) {
+        mostrarMensaje("Primero inicia un nuevo juego", "info");
+        return;
+      }
+
+      try {
+        const respuesta = await fetch("/api/comprobar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ respuesta: respuestaUsuario })
+        });
+
+        const datos = await respuesta.json();
+
+        // Limpiamos errores anteriores
+        document.querySelectorAll(".celda-error").forEach(c => c.classList.remove("celda-error"));
+
+        if (datos.correcto) {
+          mostrarMensaje("🎉 ¡Correcto! ¡Felicidades, has resuelto el Sudoku!", "correcto");
+          detenerTemporizador();
+          guardarMejorTiempo();
+          juegoActivo = false;
+
+        } else if (!datos.completo) {
+          mostrarMensaje("Aún hay celdas vacías. ¡Sigue intentándolo!", "info");
+
+        } else {
+          const numErrores = datos.errores.length;
+          mostrarMensaje(`Hay ${numErrores} error${numErrores !== 1 ? "es" : ""}. Las celdas en rojo están mal.`, "error");
+
+          datos.errores.forEach(([fila, col]) => {
+            const celda = obtenerCelda(fila, col);
+            celda.classList.add("celda-error");
+          });
+        }
+
+      } catch (error) {
+        mostrarMensaje("Error al conectar con el servidor", "error");
+        console.error("Error en comprobar:", error);
+      }
+    }
+
+
+    // =========================================================================
+    // FUNCIÓN: pedirPista
+    // =========================================================================
+    // Pide una pista al servidor: revela una celda incorrecta o vacía.
+    // =========================================================================
+    async function pedirPista() {
+      if (!juegoActivo) {
+        mostrarMensaje("Primero inicia un nuevo juego", "info");
+        return;
+      }
+
+      if (pistasDisponibles <= 0) {
+        mostrarMensaje("Ya has usado todas tus pistas", "error");
+        return;
+      }
+
+      try {
+        const respuesta = await fetch("/api/pista", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ respuesta: respuestaUsuario })
+        });
+
+        const datos = await respuesta.json();
+
+        if (datos.mensaje) {
+          mostrarMensaje(datos.mensaje, "correcto");
+          return;
+        }
+
+        const { fila, col, valor } = datos;
+        respuestaUsuario[fila][col] = valor;
+
+        const celda = obtenerCelda(fila, col);
+        celda.textContent = valor;
+        celda.classList.remove("celda-error", "celda-usuario");
+        celda.classList.add("celda-pista");
+
+        // Restamos una pista y actualizamos los puntos visuales
+        pistasDisponibles--;
+        actualizarPuntosPistas();
+        mostrarMensaje(`Pista revelada en fila ${fila + 1}, columna ${col + 1}`, "info");
+
+      } catch (error) {
+        mostrarMensaje("Error al pedir pista", "error");
+        console.error("Error en pedirPista:", error);
+      }
+    }
+
+
+    // =========================================================================
+    // FUNCIÓN: revelarSolucion
+    // =========================================================================
+    // Muestra toda la solución. Pide confirmación antes.
+    // =========================================================================
+    async function revelarSolucion() {
+      if (!juegoActivo) {
+        mostrarMensaje("Primero inicia un nuevo juego", "info");
+        return;
+      }
+
+      const confirmado = confirm("¿Seguro que quieres ver la solución? Esto terminará la partida.");
+      if (!confirmado) return;
+
+      try {
+        const respuesta = await fetch("/api/solucion");
+        const datos     = await respuesta.json();
+
+        const celdas = document.querySelectorAll(".celda");
+        for (let fila = 0; fila < 9; fila++) {
+          for (let col = 0; col < 9; col++) {
+            const indice = fila * 9 + col;
+            const celda  = celdas[indice];
+            const valor  = datos.solucion[fila][col];
+
+            celda.textContent = valor;
+            celda.classList.remove("celda-error", "celda-pista", "celda-usuario", "celda-seleccionada");
+          }
+        }
+
+        detenerTemporizador();
+        juegoActivo = false;
+        mostrarMensaje("Solución revelada. Pulsa 'Nuevo juego' para intentarlo de nuevo.", "info");
+
+      } catch (error) {
+        mostrarMensaje("Error al obtener la solución", "error");
+        console.error("Error en revelarSolucion:", error);
+      }
+    }
+
+
+    // =========================================================================
+    // FUNCIÓN: obtenerCelda
+    // =========================================================================
+    // Devuelve el elemento HTML de la celda en la posición (fila, col).
+    // =========================================================================
+    function obtenerCelda(fila, col) {
+      return document.querySelector(`.celda[data-fila="${fila}"][data-col="${col}"]`);
+    }
+
+
+    // =========================================================================
+    // FUNCIONES: temporizador
+    // =========================================================================
+
+    function iniciarTemporizador() {
+      intervaloTemporizador = setInterval(() => {
+        segundosTranscurridos++;
+        actualizarDisplayTemporizador();
+      }, 1000);
+    }
+
+    function detenerTemporizador() {
+      clearInterval(intervaloTemporizador);
+    }
+
+    function reiniciarTemporizador() {
+      detenerTemporizador();
+      segundosTranscurridos = 0;
+      actualizarDisplayTemporizador();
+      iniciarTemporizador();
+    }
+
+    function actualizarDisplayTemporizador() {
+      const minutos  = Math.floor(segundosTranscurridos / 60);
+      const segundos = segundosTranscurridos % 60;
+      const texto = `${String(minutos).padStart(2, "0")}:${String(segundos).padStart(2, "0")}`;
+      document.getElementById("temporizador").textContent = texto;
+    }
+
+
+    // =========================================================================
+    // FUNCIONES: mejor tiempo en localStorage
+    // =========================================================================
+    // localStorage es una forma de guardar datos en el navegador.
+    // Los datos persisten aunque el usuario cierre la pestaña.
+
+    function guardarMejorTiempo() {
+      const dificultad     = document.getElementById("dificultad").value;
+      const clave          = `sudoku-mejor-tiempo-${dificultad}`;
+      const tiempoAnterior = parseInt(localStorage.getItem(clave)) || Infinity;
+
+      if (segundosTranscurridos < tiempoAnterior) {
+        localStorage.setItem(clave, segundosTranscurridos);
+        mostrarMejorTiempo();
+      }
+    }
+
+    function mostrarMejorTiempo() {
+      const dificultad = document.getElementById("dificultad").value;
+      const clave      = `sudoku-mejor-tiempo-${dificultad}`;
+      const mejor      = parseInt(localStorage.getItem(clave));
+
+      const card = document.getElementById("card-mejor-tiempo");
+
+      if (!isNaN(mejor)) {
+        const min   = Math.floor(mejor / 60);
+        const seg   = mejor % 60;
+        const texto = `${String(min).padStart(2, "0")}:${String(seg).padStart(2, "0")}`;
+        document.getElementById("mejor-tiempo").textContent = texto;
+        card.style.display = "flex"; // mostramos la tarjeta de récord
+      } else {
+        card.style.display = "none"; // si no hay récord, la ocultamos
+      }
+    }
+
+
+    // =========================================================================
+    // FUNCIONES: mensajes de estado
+    // =========================================================================
+
+    function mostrarMensaje(texto, tipo) {
+      const el = document.getElementById("mensaje");
+      el.textContent   = texto;
+      el.style.display = "block";
+
+      el.className = "";
+      el.id = "mensaje";
+
+      if      (tipo === "correcto") el.classList.add("mensaje-correcto");
+      else if (tipo === "error")    el.classList.add("mensaje-error");
+      else                          el.classList.add("mensaje-info");
+    }
+
+    function ocultarMensaje() {
+      document.getElementById("mensaje").style.display = "none";
+    }
+
+
+    // =========================================================================
+    // TECLADO FÍSICO
+    // =========================================================================
+    // Detectamos cuando el usuario pulsa teclas numéricas en el teclado físico.
+
+    document.addEventListener("keydown", (evento) => {
+      if (evento.key >= "1" && evento.key <= "9") {
+        teclaNumero(parseInt(evento.key));
+      }
+      if (evento.key === "Delete" || evento.key === "Backspace") {
+        teclaNumero(0);
+      }
+    });
+
+
+    // =========================================================================
+    // MODAL DE OPCIONES
+    // =========================================================================
+
+    // Abre el modal añadiendo la clase "visible" al overlay
+    function abrirOpciones() {
+      document.getElementById("modal-overlay").classList.add("visible");
+    }
+
+    // Cierra el modal quitando la clase "visible"
+    function cerrarOpciones() {
+      document.getElementById("modal-overlay").classList.remove("visible");
+    }
+
+    // Cierra el modal si el usuario hace clic en el fondo oscuro (fuera del modal)
+    function cerrarAlClickarFuera(evento) {
+      // evento.target es el elemento donde se hizo clic
+      // Si es el overlay (no el modal interior), cerramos
+      if (evento.target === document.getElementById("modal-overlay")) {
+        cerrarOpciones();
+      }
+    }
+
+    // Cerrar con tecla Escape
+    document.addEventListener("keydown", (evento) => {
+      if (evento.key === "Escape") cerrarOpciones();
+    });
+
+
+    // =========================================================================
+    // HELPER: aplicarSinTransicion
+    // =========================================================================
+    // Ejecuta un cambio de estilos desactivando todas las transiciones CSS.
+    // Patrón estándar para cambios de tema instantáneos:
+    //   1. Añadimos "sin-transicion" → el CSS desactiva todos los transition
+    //   2. Ejecutamos el cambio (tema, paleta...)
+    //   3. Esperamos dos frames de animación para que el navegador pinte
+    //   4. Quitamos "sin-transicion" → las transiciones vuelven
+    //
+    // requestAnimationFrame(fn) espera al siguiente frame del navegador.
+    // Necesitamos dos frames: uno para pintar el cambio, otro para restaurar.
+
+    function aplicarSinTransicion(cambio) {
+      document.documentElement.classList.add("sin-transicion");
+      cambio();
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          document.documentElement.classList.remove("sin-transicion");
+        });
+      });
+    }
+
+
+    // =========================================================================
+    // MODO OSCURO
+    // =========================================================================
+    // El toggle del modal controla esta función.
+    // Añade/quita la clase "dark" en <html>, lo que activa las variables CSS
+    // del modo oscuro definidas en html.dark { ... }
+
+    function alternarTema() {
+      const checkbox     = document.getElementById("toggle-oscuro");
+      const esModoOscuro = checkbox.checked;
+
+      // Desactivamos todas las transiciones antes de cambiar el tema
+      aplicarSinTransicion(() => {
+        document.documentElement.classList.toggle("dark", esModoOscuro);
+      });
+
+      localStorage.setItem("sudoku-tema-oscuro", esModoOscuro);
+    }
+
+
+    // =========================================================================
+    // PALETA DE COLORES
+    // =========================================================================
+    // Cambia el atributo data-palette en <html>.
+    // El CSS detecta ese atributo y sobreescribe las variables --p-*.
+
+    function seleccionarPaleta(paleta) {
+      // Desactivamos transiciones para que el cambio de color sea instantáneo
+      aplicarSinTransicion(() => {
+        if (paleta) {
+          document.documentElement.setAttribute("data-palette", paleta);
+        } else {
+          document.documentElement.removeAttribute("data-palette");
+        }
+      });
+
+      // Marcamos la opción activa en el modal
+      document.querySelectorAll(".paleta-opcion").forEach(el => {
+        el.classList.toggle("activa", el.dataset.paleta === paleta);
+      });
+
+      localStorage.setItem("sudoku-paleta", paleta);
+    }
+
+
+    // =========================================================================
+    // CARGAR PREFERENCIAS GUARDADAS
+    // =========================================================================
+    // Se llama al inicio para restaurar el tema y paleta de la última visita.
+    // Se ejecuta ANTES que todo lo demás para evitar "parpadeo" de estilos.
+
+    function cargarPreferencias() {
+      // --- Tema oscuro ---
+      const temaOscuro = localStorage.getItem("sudoku-tema-oscuro") === "true";
+      if (temaOscuro) {
+        document.documentElement.classList.add("dark");
+        // Marcamos el toggle del modal como activo
+        document.getElementById("toggle-oscuro").checked = true;
+      }
+
+      // --- Paleta de colores ---
+      const paleta = localStorage.getItem("sudoku-paleta") || "";
+      // Llamamos a seleccionarPaleta para aplicar el atributo Y marcar el círculo
+      seleccionarPaleta(paleta);
+    }
+
+
+    // =========================================================================
+    // INICIALIZACIÓN
+    // =========================================================================
+    cargarPreferencias(); // Primero: cargamos tema y paleta (evita parpadeo)
+    inicializarTablero();
+    mostrarMejorTiempo();
+
+  </script>
+
+</body>
+</html>

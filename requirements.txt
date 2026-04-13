@@ -1,0 +1,14 @@
+# =============================================================================
+# requirements.txt — Dependencias del proyecto
+# =============================================================================
+#
+# Este archivo lista las librerías externas que necesita el proyecto.
+# Para instalarlas todas de golpe, ejecuta en la terminal:
+#
+#   pip install -r requirements.txt
+#
+# =============================================================================
+
+# Flask: el framework web que usamos para crear el servidor
+# Incluye todo lo necesario: servidor, rutas, templates, JSON, sesiones...
+flask==3.0.3
