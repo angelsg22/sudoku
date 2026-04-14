@@ -873,6 +873,50 @@
     }
 
     /* ------------------------------------------------------------------ */
+    /* MODO APUNTE — celda con mini cuadrícula 3×3                         */
+    /* ------------------------------------------------------------------ */
+    /*
+      Cuando el modo apunte está activo, cada celda vacía se convierte en
+      una cuadrícula interna de 3×3. Cada sub-celda ocupa un número del 1 al 9
+      (en orden de lectura: 1 arriba-izquierda, 9 abajo-derecha).
+
+      La clase "celda-con-apuntes" sobreescribe el display:flex de .celda
+      para pasar a display:grid con 9 hijos iguales.
+    */
+    .celda-con-apuntes {
+      display: grid !important;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(3, 1fr);
+      padding: 2px;
+      align-items: stretch;
+      justify-items: stretch;
+    }
+
+    /* Cada sub-celda de apunte: muestra o deja vacío un número candidato */
+    .apunte-mini {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      /* Aproximadamente 1/3 del tamaño del número principal */
+      font-size: clamp(5px, 1vw, 8px);
+      color: #9ca3af;
+      font-weight: 600;
+      line-height: 1;
+    }
+
+    /* En modo oscuro los apuntes se ven con un tono más claro */
+    html.dark .apunte-mini {
+      color: #6b7280;
+    }
+
+    /* En móvil ajustamos el tamaño para que sigan siendo legibles */
+    @media (max-width: 640px) {
+      .apunte-mini {
+        font-size: clamp(4px, 1.1vw, 7px);
+      }
+    }
+
+    /* ------------------------------------------------------------------ */
     /* ANIMACIONES                                                          */
     /* ------------------------------------------------------------------ */
     @keyframes pulsar {
@@ -1048,6 +1092,15 @@
             <span class="toggle-track"></span>
           </label>
         </div>
+
+        <!-- Toggle para modo apunte (añadido: muestra candidatos en cada celda vacía) -->
+        <div class="toggle-fila" style="margin-top: 12px;">
+          <span class="toggle-label">✏️ Modo apunte</span>
+          <label class="toggle">
+            <input type="checkbox" id="toggle-apunte" onchange="toggleModoApunte()">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
       </div>
 
       <hr class="modal-separador">
@@ -1130,6 +1183,10 @@
     let colSeleccionada   = -1;  // Columna de la celda seleccionada
     let pistasDisponibles = 3;   // El usuario tiene 3 pistas por partida
     let juegoActivo       = false; // ¿Hay una partida en curso?
+
+    // Variables del modo apunte
+    let modoApunte        = false; // ¿Está activo el modo apunte?
+    let candidatosActuales = {};   // Últimos candidatos recibidos del servidor { "fila-col": [nums] }
 
     // Variables del temporizador
     let segundosTranscurridos = 0;
@@ -1236,19 +1293,45 @@
     //
     // Parámetros:
     //   num → número a introducir (0 = borrar)
+    //
+    // Cambio: si el modo apunte está activo, al escribir un número definitivo
+    // se limpia la mini cuadrícula y se actualizan los apuntes de las celdas
+    // relacionadas (misma fila, columna y bloque 3×3).
     // =========================================================================
     function teclaNumero(num) {
       if (!juegoActivo) return;
       if (!celdaSeleccionada) return;
 
+      // Actualizamos la matriz con el valor del usuario
       respuestaUsuario[filaSeleccionada][colSeleccionada] = num;
-      celdaSeleccionada.textContent = num === 0 ? "" : num;
 
-      celdaSeleccionada.classList.remove("celda-error", "celda-pista");
-      celdaSeleccionada.classList.add("celda-usuario");
+      if (modoApunte) {
+        // --- Modo apunte activo ---
+        if (num !== 0) {
+          // Número definitivo: mostramos el dígito con estilo normal
+          celdaSeleccionada.classList.remove("celda-con-apuntes", "celda-error", "celda-pista");
+          celdaSeleccionada.classList.add("celda-usuario");
+          celdaSeleccionada.textContent = num;
 
-      if (num === 0) {
-        celdaSeleccionada.classList.remove("celda-usuario");
+          // Recalculamos candidatos del tablero actualizado y re-renderizamos
+          // las celdas afectadas (misma fila, columna y bloque)
+          cargarYRenderizarCandidatos();
+        } else {
+          // Borrar: la celda vuelve a estar vacía → mostramos sus candidatos
+          celdaSeleccionada.classList.remove("celda-usuario", "celda-error", "celda-pista");
+          celdaSeleccionada.textContent = "";
+          cargarYRenderizarCandidatos();
+        }
+
+      } else {
+        // --- Modo normal (comportamiento original) ---
+        celdaSeleccionada.textContent = num === 0 ? "" : num;
+        celdaSeleccionada.classList.remove("celda-error", "celda-pista", "celda-con-apuntes");
+        celdaSeleccionada.classList.add("celda-usuario");
+
+        if (num === 0) {
+          celdaSeleccionada.classList.remove("celda-usuario");
+        }
       }
     }
 
@@ -1305,6 +1388,11 @@
         reiniciarTemporizador();
         mostrarMejorTiempo(); // actualizamos el récord para esta dificultad
         ocultarMensaje();
+
+        // Si el modo apunte está activo, cargamos los candidatos del nuevo tablero
+        if (modoApunte) {
+          cargarYRenderizarCandidatos();
+        }
 
       } catch (error) {
         mostrarMensaje("Error al conectar con el servidor. ¿Está Flask en ejecución?", "error");
@@ -1397,13 +1485,19 @@
 
         const celda = obtenerCelda(fila, col);
         celda.textContent = valor;
-        celda.classList.remove("celda-error", "celda-usuario");
+        celda.classList.remove("celda-error", "celda-usuario", "celda-con-apuntes");
         celda.classList.add("celda-pista");
 
         // Restamos una pista y actualizamos los puntos visuales
         pistasDisponibles--;
         actualizarPuntosPistas();
         mostrarMensaje(`Pista revelada en fila ${fila + 1}, columna ${col + 1}`, "info");
+
+        // Si el modo apunte está activo, actualizamos los candidatos de las celdas
+        // afectadas por el número que se acaba de revelar
+        if (modoApunte) {
+          cargarYRenderizarCandidatos();
+        }
 
       } catch (error) {
         mostrarMensaje("Error al pedir pista", "error");
@@ -1430,6 +1524,9 @@
         const respuesta = await fetch("/api/solucion");
         const datos     = await respuesta.json();
 
+        // Limpiamos los apuntes antes de rellenar todas las celdas
+        limpiarTodosLosApuntes();
+
         const celdas = document.querySelectorAll(".celda");
         for (let fila = 0; fila < 9; fila++) {
           for (let col = 0; col < 9; col++) {
@@ -1438,7 +1535,7 @@
             const valor  = datos.solucion[fila][col];
 
             celda.textContent = valor;
-            celda.classList.remove("celda-error", "celda-pista", "celda-usuario", "celda-seleccionada");
+            celda.classList.remove("celda-error", "celda-pista", "celda-usuario", "celda-seleccionada", "celda-con-apuntes");
           }
         }
 
@@ -1552,6 +1649,26 @@
 
 
     // =========================================================================
+    // CLIC FUERA DEL TABLERO → deseleccionar celda
+    // =========================================================================
+    // Si el usuario hace clic en cualquier parte de la página que no sea
+    // una celda del tablero, quitamos la selección actual.
+
+    document.addEventListener("click", (evento) => {
+      if (!celdaSeleccionada) return;
+      // closest(".celda") sube por el árbol DOM buscando un ancestro con esa clase.
+      // Si el clic fue dentro de una celda, devuelve la celda → no hacemos nada.
+      // Si fue fuera, devuelve null → deseleccionamos.
+      if (!evento.target.closest(".celda")) {
+        celdaSeleccionada.classList.remove("celda-seleccionada");
+        celdaSeleccionada = null;
+        filaSeleccionada  = -1;
+        colSeleccionada   = -1;
+      }
+    });
+
+
+    // =========================================================================
     // TECLADO FÍSICO
     // =========================================================================
     // Detectamos cuando el usuario pulsa teclas numéricas en el teclado físico.
@@ -1661,6 +1778,126 @@
       });
 
       localStorage.setItem("sudoku-paleta", paleta);
+    }
+
+
+    // =========================================================================
+    // MODO APUNTE
+    // =========================================================================
+    //
+    // El modo apunte muestra automáticamente, dentro de cada celda vacía,
+    // los números que todavía son posibles según las reglas del Sudoku.
+    // La información viene del servidor (/api/candidatos) para usar la misma
+    // lógica que ya existe en Python (es_valido).
+
+
+    // -------------------------------------------------------------------------
+    // FUNCIÓN: toggleModoApunte
+    // -------------------------------------------------------------------------
+    // Se llama cuando el usuario cambia el estado del toggle en el modal.
+    // Activa o desactiva los apuntes en todo el tablero.
+    // -------------------------------------------------------------------------
+    async function toggleModoApunte() {
+      modoApunte = document.getElementById("toggle-apunte").checked;
+
+      if (modoApunte) {
+        // Si no hay partida activa, dejamos el toggle encendido pero sin hacer nada
+        if (!juegoActivo) return;
+        // Cargamos y mostramos los candidatos en todas las celdas vacías
+        await cargarYRenderizarCandidatos();
+      } else {
+        // Eliminamos todos los apuntes y volvemos al diseño original
+        limpiarTodosLosApuntes();
+      }
+    }
+
+
+    // -------------------------------------------------------------------------
+    // FUNCIÓN: cargarYRenderizarCandidatos
+    // -------------------------------------------------------------------------
+    // Llama a /api/candidatos con el estado actual del tablero y renderiza
+    // los apuntes en todas las celdas vacías.
+    // -------------------------------------------------------------------------
+    async function cargarYRenderizarCandidatos() {
+      try {
+        const respuesta = await fetch("/api/candidatos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tablero: respuestaUsuario })
+        });
+
+        const datos = await respuesta.json();
+        candidatosActuales = datos.candidatos;
+
+        // Recorremos todas las celdas y renderizamos apuntes donde corresponde
+        for (let fila = 0; fila < 9; fila++) {
+          for (let col = 0; col < 9; col++) {
+            if (respuestaUsuario[fila][col] === 0) {
+              // Celda vacía: mostramos sus candidatos
+              const clave = `${fila}-${col}`;
+              const lista = candidatosActuales[clave] || [];
+              renderizarApuntesEnCelda(fila, col, lista);
+            }
+          }
+        }
+
+      } catch (error) {
+        console.error("Error al cargar candidatos:", error);
+      }
+    }
+
+
+    // -------------------------------------------------------------------------
+    // FUNCIÓN: renderizarApuntesEnCelda
+    // -------------------------------------------------------------------------
+    // Convierte una celda vacía en una mini cuadrícula 3×3 que muestra
+    // los números candidatos en su posición fija (1 en pos.1, 2 en pos.2...).
+    //
+    // Parámetros:
+    //   fila        → índice de fila (0-8)
+    //   col         → índice de columna (0-8)
+    //   candidatos  → array de números posibles, ej. [1, 3, 7]
+    // -------------------------------------------------------------------------
+    function renderizarApuntesEnCelda(fila, col, candidatos) {
+      const celda = obtenerCelda(fila, col);
+      if (!celda) return;
+      // No tocamos celdas fijas ni celdas con valor del usuario
+      if (celda.classList.contains("celda-fija")) return;
+      if (respuestaUsuario[fila][col] !== 0) return;
+
+      // Activamos la clase que transforma la celda en grid 3×3
+      celda.classList.add("celda-con-apuntes");
+      // Limpiamos el contenido anterior (texto o mini-celdas anteriores)
+      celda.textContent = "";
+
+      // Creamos las 9 sub-celdas, una por número del 1 al 9
+      // La posición dentro del grid es fija: 1 arriba-izq, 9 abajo-der
+      for (let n = 1; n <= 9; n++) {
+        const mini = document.createElement("div");
+        mini.classList.add("apunte-mini");
+
+        // Solo mostramos el número si es candidato; si no, la sub-celda queda vacía
+        if (candidatos.includes(n)) {
+          mini.textContent = n;
+        }
+
+        celda.appendChild(mini);
+      }
+    }
+
+
+    // -------------------------------------------------------------------------
+    // FUNCIÓN: limpiarTodosLosApuntes
+    // -------------------------------------------------------------------------
+    // Quita los apuntes de todas las celdas y restaura el aspecto original.
+    // Se llama al desactivar el modo apunte o al revelar la solución.
+    // -------------------------------------------------------------------------
+    function limpiarTodosLosApuntes() {
+      // Buscamos solo las celdas que tienen apuntes activos
+      document.querySelectorAll(".celda-con-apuntes").forEach(celda => {
+        celda.classList.remove("celda-con-apuntes");
+        celda.textContent = ""; // Las celdas con apuntes están vacías → quedamos con ""
+      });
     }
 
 

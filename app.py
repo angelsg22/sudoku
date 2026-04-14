@@ -146,6 +146,26 @@ def ver_solucion():
 
 
 # =============================================================================
+# RUTA: /api/candidatos
+# =============================================================================
+# El modo apunte del frontend llama a esta ruta para saber qué números son
+# posibles en cada celda vacía según el estado actual del tablero.
+#
+# El navegador envía: {"tablero": [[...matriz 9x9 con estado actual...]]}
+# Flask responde con: {"candidatos": {"fila-col": [numeros], ...}}
+# =============================================================================
+@app.route("/api/candidatos", methods=["POST"])
+def candidatos():
+    datos = request.json
+    tablero = datos.get("tablero")
+
+    # Calculamos los candidatos usando la lógica de sudoku.py
+    resultado = sudoku.calcular_candidatos(tablero)
+
+    return jsonify({"candidatos": resultado})
+
+
+# =============================================================================
 # Punto de entrada del programa
 # =============================================================================
 # Este bloque se ejecuta cuando corres: python app.py

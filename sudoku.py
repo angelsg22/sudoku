@@ -205,6 +205,48 @@ def generar_puzzle(dificultad="medio"):
 
 
 # =============================================================================
+# FUNCIÓN: calcular_candidatos
+# =============================================================================
+# Calcula los "candidatos" de cada celda vacía del tablero.
+#
+# ¿Qué es un candidato en Sudoku?
+#   Es un número que PODRÍA ir en una celda concreta sin violar ninguna regla.
+#   Por ejemplo, si en la fila 2, columna 4 ya no están el 1, el 3 ni el 7
+#   (porque aparecen en la misma fila, columna o bloque), los candidatos
+#   serían todos los números del 1 al 9 excepto esos tres.
+#
+# Parámetros:
+#   tablero → matriz 9x9 (0 = celda vacía, 1-9 = número colocado)
+#
+# Devuelve: diccionario donde la clave es "fila-col" y el valor es
+#           una lista de números candidatos para esa posición.
+#   Ejemplo: { "2-4": [1, 3, 7], "5-0": [2, 6], ... }
+#
+# Solo incluye celdas que tienen al menos un candidato.
+# =============================================================================
+def calcular_candidatos(tablero):
+    candidatos = {}
+
+    for fila in range(9):
+        for col in range(9):
+            # Solo calculamos candidatos para celdas vacías
+            if tablero[fila][col] == 0:
+                posibles = []
+
+                # Probamos cada número del 1 al 9 con las reglas del Sudoku
+                for num in range(1, 10):
+                    if es_valido(tablero, fila, col, num):
+                        posibles.append(num)
+
+                # Solo añadimos la celda si tiene al menos un candidato
+                if posibles:
+                    clave = f"{fila}-{col}"
+                    candidatos[clave] = posibles
+
+    return candidatos
+
+
+# =============================================================================
 # FUNCIÓN: validar_solucion
 # =============================================================================
 # Comprueba si la respuesta del usuario es correcta.
